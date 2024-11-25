@@ -620,7 +620,7 @@ const PhotoBook = () => {
                         <Button
                           key={num}
                           variant={newPagePhotoCount === num ? "default" : "outline"}
-                          onClick={() => setNewPagePhotoCount(num)}
+                          onClick={() => num !== undefined && setNewPagePhotoCount(num)}
                           className="h-20 text-lg"
                         >
                           {num} {num === 1 ? 'Photo' : 'Photos'}
@@ -714,7 +714,7 @@ const PhotoBook = () => {
                   Export PDF
                 </Button>
                 <Button 
-                  variant="destructive"
+                  variant="outline"
                   onClick={() => setShowResetDialog(true)}
                   className="flex items-center gap-2"
                 >
@@ -736,7 +736,7 @@ const PhotoBook = () => {
                 <Button variant="outline" onClick={() => setShowResetDialog(false)}>
                   Cancel
                 </Button>
-                <Button variant="destructive" onClick={resetPhotobook}>
+                <Button variant="outline" onClick={resetPhotobook}>
                   Reset Everything
                 </Button>
               </DialogFooter>

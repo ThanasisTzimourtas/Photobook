@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import { jsPDF } from "jspdf";
 import { Download, PlusCircle, Palette, Layout, Image as ImageIcon, X } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -57,7 +56,7 @@ const PhotoBook = () => {
   const [isAddingPage, setIsAddingPage] = useState(false);
   const [newPagePhotoCount, setNewPagePhotoCount] = useState<number>(2);
 
-  const layouts = {
+  const layouts: { [key: string]: string } = {
     grid: 'grid-cols-2 gap-4',
     single: 'grid-cols-1',
     featured: 'grid-cols-3 gap-2'
@@ -131,13 +130,10 @@ const PhotoBook = () => {
         format: "a4",
       });
 
-
-
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 20;
 
-      // Convert hex to RGB for PDF background
       const hex = background.color.replace('#', '');
       const r = parseInt(hex.substring(0, 2), 16);
       const g = parseInt(hex.substring(2, 4), 16);
@@ -147,13 +143,11 @@ const PhotoBook = () => {
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, pageWidth, pageHeight, 'F');
       
-      // Title
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(24);
       pdf.setTextColor(0, 0, 0);
       pdf.text(title || "My PhotoBook", pageWidth / 2, 40, { align: "center" });
 
-      // Cover Photo
       if (coverPhoto) {
         try {
           const img = new Image();
@@ -165,7 +159,7 @@ const PhotoBook = () => {
 
           const aspectRatio = img.width / img.height;
           const maxWidth = pageWidth - 2 * margin;
-          const maxHeight = pageHeight - 80; // Leave space for title
+          const maxHeight = pageHeight - 80;
           
           let imgWidth = maxWidth;
           let imgHeight = imgWidth / aspectRatio;
@@ -189,11 +183,9 @@ const PhotoBook = () => {
         const page = pages[pageIndex];
         pdf.addPage();
 
-        // Page background
         pdf.setFillColor(255, 255, 255);
         pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
-        // Section title
         if (page.sectionTitle) {
           pdf.setFont("helvetica", "bold");
           pdf.setFontSize(18);
@@ -220,13 +212,9 @@ const PhotoBook = () => {
           const y = margin + titleSpace + (row * (photoHeight + 10));
 
           try {
-            // Background for photo
             pdf.setFillColor(r, g, b);
-           // pdf.setFillOpacity(background.opacity);
             pdf.rect(x, y, photoWidth, photoHeight, 'F');
-            //pdf.setFillOpacity(1);
 
-            // Add photo
             const img = new Image();
             img.src = photo.image;
             await new Promise((resolve, reject) => {
@@ -248,7 +236,6 @@ const PhotoBook = () => {
 
             pdf.addImage(photo.image, 'JPEG', imgX, imgY, imgWidth, imgHeight);
 
-            // Add caption if exists
             if (photo.caption) {
               pdf.setFont("helvetica", "normal");
               pdf.setFontSize(10);
@@ -262,7 +249,6 @@ const PhotoBook = () => {
         }
       }
 
-      // Save the PDF
       pdf.save(`${title || 'photobook'}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -297,7 +283,7 @@ const PhotoBook = () => {
                   placeholder="My Beautiful Photobook"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full p-3 border rounded-lg shadow-sm"
+                  className="w-full p-3 border rounded-lg shadow-sm bg-white text-black"
                 />
               </div>
               
@@ -416,97 +402,97 @@ const PhotoBook = () => {
                     placeholder="Section Title (optional)"
                     value={page.sectionTitle || ""}
                     onChange={(e) => handleSectionTitleChange(pageIndex, e.target.value)}
-                    className="text-xl font-semibold p-2 border rounded flex-grow mr-4"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => deletePage(pageIndex)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className={`grid ${layouts[page.layout]} gap-4`}>
-                  {page.photos.map((photo, photoIndex) => (
-                    <div key={photoIndex} className="aspect-square">
-                      <label
-                        className="flex flex-col items-center justify-center w-full h-full border rounded-lg cursor-pointer overflow-hidden"
-                        style={{
-                          backgroundColor: background.color,
-                          opacity: background.opacity
-                        }}
-                      >
-                        {photo.image ? (
-                          <div className="relative w-full h-full group">
-                            <img
-                              src={photo.image}
-                              alt={`Photo ${photoIndex + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Add caption..."
-                              value={photo.caption || ""}
-                              onChange={(e) => handleCaptionChange(pageIndex, photoIndex, e.target.value)}
-                              className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                            />
-                          </div>
-                        ) : (
-                          <>
-                            <ImageIcon className="w-12 h-12 text-gray-400 mb-2" />
-                            <span className="text-sm text-gray-500">Upload Image</span>
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept="image/*"
-                              onChange={(e) =>
-                                e.target.files && handleImageUpload(pageIndex, photoIndex, e.target.files[0])
-                              }
-                            />
-                          </>
-                        )}
-                      </label>
-                    </div>
+                    className="text-xl font-semibold p-2 border rounded flex-grow mr-4 bg-white text-black"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => deletePage(pageIndex)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className={`grid ${layouts[page.layout]} gap-4`}>
+                    {page.photos.map((photo, photoIndex) => (
+                      <div key={photoIndex} className="aspect-square">
+                        <label
+                          className="flex flex-col items-center justify-center w-full h-full border rounded-lg cursor-pointer overflow-hidden"
+                          style={{
+                            backgroundColor: background.color,
+                            opacity: background.opacity
+                          }}
+                        >
+                          {photo.image ? (
+                            <div className="relative w-full h-full group">
+                              <img
+                                src={photo.image}
+                                alt={`Photo ${photoIndex + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Add caption..."
+                                value={photo.caption || ""}
+                                onChange={(e) => handleCaptionChange(pageIndex, photoIndex, e.target.value)}
+                                className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <ImageIcon className="w-12 h-12 text-gray-400 mb-2" />
+                              <span className="text-sm text-gray-500">Upload Image</span>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) =>
+                                  e.target.files && handleImageUpload(pageIndex, photoIndex, e.target.files[0])
+                                }
+                              />
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+  
+            <Dialog open={isAddingPage} onOpenChange={setIsAddingPage}>
+              <DialogTrigger asChild>
+                <Button
+                  className="w-full mt-6 flex items-center justify-center gap-2 py-6"
+                  variant="outline"
+                >
+                  <PlusCircle className="w-6 h-6" />
+                  Add New Page
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Select Number of Photos</DialogTitle>
+                </DialogHeader>
+                <div className="grid grid-cols-3 gap-4 py-4">
+                  {[1, 2, 3, 4, 5, 6].map((num) => (
+                    <Button
+                      key={num}
+                      variant={newPagePhotoCount === num ? "default" : "outline"}
+                      onClick={() => setNewPagePhotoCount(num)}
+                      className="h-20 text-lg"
+                    >
+                      {num} {num === 1 ? 'Photo' : 'Photos'}
+                    </Button>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          <Dialog open={isAddingPage} onOpenChange={setIsAddingPage}>
-            <DialogTrigger asChild>
-              <Button
-                className="w-full mt-6 flex items-center justify-center gap-2 py-6"
-                variant="outline"
-              >
-                <PlusCircle className="w-6 h-6" />
-                Add New Page
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Select Number of Photos</DialogTitle>
-              </DialogHeader>
-              <div className="grid grid-cols-3 gap-4 py-4">
-                {[1, 2, 3, 4, 5, 6].map((num) => (
-                  <Button
-                    key={num}
-                    variant={newPagePhotoCount === num ? "default" : "outline"}
-                    onClick={() => setNewPagePhotoCount(num)}
-                    className="h-20 text-lg"
-                  >
-                    {num} {num === 1 ? 'Photo' : 'Photos'}
-                  </Button>
-                ))}
-              </div>
-              <Button onClick={addPage} className="w-full">Create Page</Button>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default PhotoBook;
+                <Button onClick={addPage} className="w-full">Create Page</Button>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
+      </div>
+    );
+  };
+  
+  export default PhotoBook;

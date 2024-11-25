@@ -1,10 +1,25 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import { jsPDF } from "jspdf";
-import { Download, PlusCircle, Palette } from "lucide-react";
+import { Download, PlusCircle, Palette, Layout, Image as ImageIcon, X, Type } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Image from 'next/image';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Popover,
   PopoverContent,
@@ -15,11 +30,15 @@ import { Slider } from "@/components/ui/slider";
 interface Photo {
   image?: string;
   caption?: string;
+  text?: string;
+  isText: boolean;
 }
 
 interface PhotoPage {
   photos: Photo[];
   sectionTitle?: string;
+  layout: string;
+  photosPerPage: number;
 }
 
 interface BackgroundStyle {
@@ -27,8 +46,18 @@ interface BackgroundStyle {
   opacity: number;
 }
 
-const PhotoBook: React.FC = () => {
-  const [photosPerPage, setPhotosPerPage] = useState<number | null>(null);
+const getImageDimensions = (src: string): Promise<{ width: number; height: number }> => {
+  if (typeof window !== 'undefined') {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.src = src;
+    });
+  }
+  return Promise.resolve({ width: 500, height: 500 });
+};
+
+const PhotoBook = () => {
   const [pages, setPages] = useState<PhotoPage[]>([]);
   const [title, setTitle] = useState<string>("");
   const [coverPhoto, setCoverPhoto] = useState<string | undefined>();
@@ -37,15 +66,32 @@ const PhotoBook: React.FC = () => {
     color: "#F1F1F1",
     opacity: 1
   });
+  const [currentLayout, setCurrentLayout] = useState("grid");
+  const [isAddingPage, setIsAddingPage] = useState(false);
+  const [newPagePhotoCount, setNewPagePhotoCount] = useState<number>(2);
+
+  const layouts: { [key: string]: string } = {
+    grid: 'grid-cols-2 gap-4',
+    single: 'grid-cols-1',
+    featured: 'grid-cols-3 gap-2'
+  };
 
   const handleImageUpload = (pageIndex: number, photoIndex: number, file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
       const updatedPages = [...pages];
       updatedPages[pageIndex].photos[photoIndex].image = reader.result as string;
+      updatedPages[pageIndex].photos[photoIndex].isText = false;
       setPages(updatedPages);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleTextContent = (pageIndex: number, photoIndex: number, text: string) => {
+    const updatedPages = [...pages];
+    updatedPages[pageIndex].photos[photoIndex].text = text;
+    updatedPages[pageIndex].photos[photoIndex].isText = true;
+    setPages(updatedPages);
   };
 
   const handleCaptionChange = (pageIndex: number, photoIndex: number, caption: string) => {
@@ -74,16 +120,6 @@ const PhotoBook: React.FC = () => {
     }));
   };
 
-  const addPage = () => {
-    if (photosPerPage !== null) {
-      const newPage: PhotoPage = {
-        photos: Array.from({ length: photosPerPage }, () => ({ image: undefined, caption: "" })),
-        sectionTitle: "",
-      };
-      setPages([...pages, newPage]);
-    }
-  };
-
   const handleCoverPhotoUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -92,339 +128,390 @@ const PhotoBook: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const exportToPDF = async () => {
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-
-    // Convert hex to RGB for PDF background
-    const hex = background.color.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-
-    const margin = 20;
-    const spacing = 10;
-    const titleSpace = 30;
-    const minCaptionHeight = 10;
-    const lineHeight = 5;
-    const maxCaptionLines = 4;
-    
-    const availableWidth = pageWidth - (2 * margin);
-    const availableHeight = pageHeight - (2 * margin) - titleSpace;
-    
-    const cols = 2;
-    const rows = Math.ceil(photosPerPage! / 2);
-    
-    const gridWidth = (availableWidth - spacing) / cols;
-
-    // Calculate background color with opacity
-    const bgColor = {
-      r: r + (255 - r) * (1 - background.opacity),
-      g: g + (255 - g) * (1 - background.opacity),
-      b: b + (255 - b) * (1 - background.opacity)
+  const addPage = () => {
+    const newPage: PhotoPage = {
+      photos: Array.from({ length: newPagePhotoCount }, () => ({ 
+        image: undefined, 
+        caption: "", 
+        text: "",
+        isText: false 
+      })),
+      sectionTitle: "",
+      layout: currentLayout,
+      photosPerPage: newPagePhotoCount
     };
+    setPages([...pages, newPage]);
+    setIsAddingPage(false);
+  };
 
-    // Title Page
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(24);
-    pdf.text(title || "My Photobook", pageWidth / 2, 40, { align: "center" });
+  const deletePage = (pageIndex: number) => {
+    const updatedPages = pages.filter((_, index) => index !== pageIndex);
+    setPages(updatedPages);
+  };
 
-    if (coverPhoto) {
-      const img = new Image();
-      img.src = coverPhoto;
-      const aspectRatio = img.width / img.height;
-      const imgWidth = Math.min(pageWidth - 2 * margin, (pageHeight / 2) * aspectRatio);
-      const imgHeight = imgWidth / aspectRatio;
-      const x = (pageWidth - imgWidth) / 2;
-      const y = 50;
-      pdf.addImage(img, x, y, imgWidth, imgHeight);
+  const toggleContentType = (pageIndex: number, photoIndex: number) => {
+    const updatedPages = [...pages];
+    const photo = updatedPages[pageIndex].photos[photoIndex];
+    photo.isText = !photo.isText;
+    if (photo.isText) {
+      photo.image = undefined;
+    } else {
+      photo.text = "";
     }
+    setPages(updatedPages);
+  };
 
-    // Content Pages
-    pages.forEach((page) => {
-      pdf.addPage();
-
-      if (page.sectionTitle) {
-        pdf.setFont("helvetica", "italic");
-        pdf.setFontSize(18);
-        pdf.text(page.sectionTitle, pageWidth / 2, margin + 10, { align: "center" });
-      }
-
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-      const captionHeights: number[] = page.photos.map(photo => {
-        if (!photo.caption) return minCaptionHeight;
-        const captionWidth = gridWidth - 10;
-        const lines = pdf.splitTextToSize(photo.caption, captionWidth);
-        return Math.min(lines.length, maxCaptionLines) * lineHeight + 5;
+  const exportToPDF = async () => {
+    try {
+      const pdf = new jsPDF({
+        orientation: "p",
+        unit: "mm",
+        format: "a4",
       });
 
-      const maxCaptionHeightsPerRow: number[] = [];
-      for (let i = 0; i < rows; i++) {
-        const rowCaptions = captionHeights.slice(i * 2, (i + 1) * 2);
-        maxCaptionHeightsPerRow[i] = Math.max(...rowCaptions);
-      }
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 20;
 
-      const totalCaptionHeight = maxCaptionHeightsPerRow.reduce((a, b) => a + b, 0);
-      const gridHeight = (availableHeight - (spacing * (rows - 1)) - totalCaptionHeight) / rows;
+      // Cover Page
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+      pdf.setFontSize(24);
+      pdf.text(title || "My PhotoBook", pageWidth / 2, 40, { align: "center" });
 
-      page.photos.forEach((photo, photoIndex) => {
-        const col = photoIndex % 2;
-        const row = Math.floor(photoIndex / 2);
-        
-        const previousRowsCaptionHeight = maxCaptionHeightsPerRow
-          .slice(0, row)
-          .reduce((a, b) => a + b, 0);
-        
-        const x = margin + (col * (gridWidth + spacing));
-        const y = margin + titleSpace + 
-                 (row * (gridHeight + spacing)) + 
-                 previousRowsCaptionHeight;
-
-        // Apply background with opacity
-        pdf.setFillColor(bgColor.r, bgColor.g, bgColor.b);
-        pdf.rect(x, y, gridWidth, gridHeight, "F");
-
-        if (photo.image) {
-          const img = new Image();
-          img.src = photo.image;
-          const aspectRatio = img.width / img.height;
+      if (coverPhoto) {
+        try {
+          const dimensions = await getImageDimensions(coverPhoto);
+          const aspectRatio = dimensions.width / dimensions.height;
+          const maxWidth = pageWidth - 2 * margin;
+          const maxHeight = pageHeight - 80;
+          let imgWidth = maxWidth;
+          let imgHeight = imgWidth / aspectRatio;
           
-          let imgWidth = gridWidth;
-          let imgHeight = gridWidth / aspectRatio;
-          
-          if (imgHeight > gridHeight) {
-            imgHeight = gridHeight;
-            imgWidth = gridHeight * aspectRatio;
+          if (imgHeight > maxHeight) {
+            imgHeight = maxHeight;
+            imgWidth = imgHeight * aspectRatio;
           }
-          
-          const offsetX = x + (gridWidth - imgWidth) / 2;
-          const offsetY = y + (gridHeight - imgHeight) / 2;
-          
-          pdf.addImage(img, offsetX, offsetY, imgWidth, imgHeight);
+
+          const x = (pageWidth - imgWidth) / 2;
+          pdf.addImage(coverPhoto, 'JPEG', x, 60, imgWidth, imgHeight);
+        } catch (error) {
+          console.error('Error loading cover photo:', error);
+        }
+      }
+
+      // Content Pages
+      for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+        const page = pages[pageIndex];
+        pdf.addPage();
+
+        if (page.sectionTitle) {
+          pdf.setFontSize(18);
+          pdf.text(page.sectionTitle, pageWidth / 2, margin, { align: "center" });
         }
 
-        if (photo.caption) {
-          pdf.setFontSize(10);
-          pdf.setFont("helvetica", "normal");
-          
-          const captionWidth = gridWidth - 10;
-          const lines = pdf.splitTextToSize(photo.caption, captionWidth);
-          const truncatedLines = lines.slice(0, maxCaptionLines);
-          
-          truncatedLines.forEach((line: string, lineIndex: number) => {
-            pdf.text(
-              line,
-              x + gridWidth / 2,
-              y + gridHeight + 5 + (lineIndex * lineHeight),
-              { align: "center" }
-            );
-          });
+        const titleSpace = page.sectionTitle ? 15 : 0;
+        const availableHeight = pageHeight - (2 * margin) - titleSpace;
+        const photosPerRow = page.layout === 'single' ? 1 : page.layout === 'featured' ? 3 : 2;
+        const rows = Math.ceil(page.photos.length / photosPerRow);
+
+        const photoWidth = (pageWidth - (2 * margin) - ((photosPerRow - 1) * 10)) / photosPerRow;
+        const photoHeight = (availableHeight - ((rows - 1) * 10)) / rows;
+
+        for (let photoIndex = 0; photoIndex < page.photos.length; photoIndex++) {
+          const photo = page.photos[photoIndex];
+          const row = Math.floor(photoIndex / photosPerRow);
+          const col = photoIndex % photosPerRow;
+          const x = margin + (col * (photoWidth + 10));
+          const y = margin + titleSpace + (row * (photoHeight + 10));
+
+          if (photo.isText && photo.text) {
+            pdf.setFontSize(12);
+            pdf.text(photo.text, x, y + 10, {
+              maxWidth: photoWidth,
+              align: 'left'
+            });
+          } else if (photo.image) {
+            try {
+              pdf.addImage(photo.image, 'JPEG', x, y, photoWidth, photoHeight);
+            } catch (error) {
+              console.error(`Error processing photo ${photoIndex}:`, error);
+            }
+          }
+
+          if (photo.caption) {
+            pdf.setFontSize(10);
+            pdf.text(photo.caption, x + photoWidth / 2, y + photoHeight + 5, { align: "center" });
+          }
         }
-      });
-    });
+      }
 
-    pdf.save("photobook.pdf");
-  };
-
-  const initializePages = () => {
-    if (photosPerPage && photosPerPage > 0) {
-      const initialPage: PhotoPage = {
-        photos: Array.from({ length: photosPerPage }, () => ({ image: undefined, caption: "" })),
-        sectionTitle: "",
-      };
-      setPages([initialPage]);
+      pdf.save(`${title || 'photobook'}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
     }
-  };
-
-  const startApp = () => {
-    setWelcomeScreen(false);
   };
 
   return (
-    <div className="flex flex-col items-center space-y-6">
-      {/* Welcome Screen */}
-      {welcomeScreen && (
-        <Card className="w-full max-w-lg">
-          <CardContent className="p-6 text-center">
-            <h2 className="text-lg font-semibold mb-4">Welcome to the Photobook App!</h2>
-            <p className="text-gray-600 mb-4">Click below to start creating your photobook.</p>
-            <Button
-              onClick={startApp}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md"
-            >
-              Start
+    <div className="min-h-screen bg-gray-100 p-8">
+      {welcomeScreen ? (
+        <Card className="max-w-lg mx-auto">
+          <CardContent className="p-8 text-center">
+            <h2 className="text-3xl font-bold mb-4 text-primary">PhotoBook Creator</h2>
+            <p className="text-gray-600 mb-8 text-lg">Create beautiful photo books with custom layouts</p>
+            <Button onClick={() => setWelcomeScreen(false)} className="w-full py-6 text-lg">
+              Get Started
             </Button>
           </CardContent>
         </Card>
-      )}
+      ) : pages.length === 0 ? (
+        <Card className="max-w-lg mx-auto">
+          <CardContent className="p-8">
+            <h2 className="text-2xl font-bold mb-6 text-center">Setup Your PhotoBook</h2>
+            <div className="space-y-8">
+              <div>
+                <label className="block text-sm font-medium mb-2">Book Title</label>
+                <input
+                  type="text"
+                  placeholder="My Beautiful Photobook"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full p-3 border rounded-lg shadow-sm bg-white text-black"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Cover Photo</label>
+                <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  {coverPhoto ? (
+                    <Image
+                      src={coverPhoto}
+                      alt="Cover"
+                      width={500}
+                      height={300}
+                      className="max-h-full object-contain rounded-lg"
+                    />
+                  ) : (
+                    <div className="text-center">
+                      <PlusCircle className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <span className="text-sm text-gray-500">Upload Cover Photo</span>
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => e.target.files && handleCoverPhotoUpload(e.target.files[0])}
+                  />
+                </label>
+              </div>
 
-      {/* Title and Cover Photo */}
-      {!welcomeScreen && photosPerPage === null && (
-        <Card className="w-full max-w-lg">
-          <CardContent className="p-6 text-center">
-            <h2 className="text-lg font-semibold mb-4">Enter a title for your photobook</h2>
-            <input
-              type="text"
-              placeholder="My Beautiful Photobook"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full mb-4 p-2 border border-gray-300 rounded-md text-black"
-            />
-            <h2 className="text-lg font-semibold mb-4">Upload a cover photo (optional)</h2>
-            <label className="flex flex-col items-center justify-center w-full h-64 cursor-pointer border border-gray-300 rounded-md bg-gray-200">
-              {coverPhoto ? (
-                <img src={coverPhoto} alt="Cover" className="max-w-full max-h-full object-contain" />
-              ) : (
-                <>
-                  <PlusCircle size={32} className="text-gray-400" />
-                  <span className="text-sm text-gray-500">Upload Cover Photo</span>
-                </>
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) =>
-                  e.target.files && handleCoverPhotoUpload(e.target.files[0])
-                }
-              />
-            </label>
-            <h2 className="text-lg font-semibold mt-4">How many photos per page?</h2>
-            <div className="flex justify-center space-x-4">
-              {[2, 3, 4].map((num) => (
-                <Button
-                  key={num}
-                  onClick={() => {
-                    setPhotosPerPage(num);
-                    initializePages();
-                  }}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-md"
-                >
-                  {num}
-                </Button>
-              ))}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className="w-full py-6 text-lg">Create First Page</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Select Number of Photos</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid grid-cols-3 gap-4 py-4">
+                    {[1, 2, 3, 4, 5, 6].map((num) => (
+                      <Button
+                        key={num}
+                        variant={newPagePhotoCount === num ? "default" : "outline"}
+                        onClick={() => setNewPagePhotoCount(num)}
+                        className="h-20 text-lg"
+                      >
+                        {num} {num === 1 ? 'Photo' : 'Photos'}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button onClick={addPage} className="w-full">Create Page</Button>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : (
+        <div className="max-w-5xl mx-auto space-y-6">
+          <Card className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <Select value={currentLayout} onValueChange={setCurrentLayout}>
+                  <SelectTrigger className="w-32">
+                    <Layout className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Layout" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="grid">Grid</SelectItem>
+                    <SelectItem value="single">Single</SelectItem>
+                    <SelectItem value="featured">Featured</SelectItem>
+                  </SelectContent>
+                </Select>
 
-      {/* Main App */}
-      {!welcomeScreen && photosPerPage !== null && (
-        <>
-          {/* Background Controls */}
-          <Card className="w-full max-w-4xl p-4">
-            <div className="flex items-center space-x-4">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <Palette className="h-4 w-4" />
-                    Background Style
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium">Color</label>
-                      <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Palette className="w-4 h-4" />
+                      Background
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium">Color</label>
                         <input
                           type="color"
                           value={background.color}
                           onChange={handleBackgroundColorChange}
-                          className="w-full h-8 cursor-pointer"
+                          className="w-full h-8 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Opacity</label>
+                        <Slider
+                          value={[background.opacity]}
+                          max={1}
+                          step={0.1}
+                          onValueChange={handleOpacityChange}
+                          className="mt-2"
                         />
                       </div>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium">Opacity</label>
-                      <Slider
-                        defaultValue={[background.opacity]}
-                        max={1}
-                        step={0.1}
-                        onValueChange={handleOpacityChange}
-                        className="mt-2"
-                      />
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <Button onClick={exportToPDF} className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Export PDF
+              </Button>
             </div>
           </Card>
 
-          {/* Photo Pages */}
-          <div className="flex flex-col space-y-6 w-full max-w-4xl">
-            {pages.map((page, pageIndex) => (
-              <div key={pageIndex} className="flex flex-col space-y-4 p-4 border border-gray-300 rounded-md bg-gray-50">
-                <input
-                  type="text"
-                  placeholder="Section Title (optional)"
-                  value={page.sectionTitle || ""}
-                  onChange={(e) => handleSectionTitleChange(pageIndex, e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-md text-black"
-                />
-                <div className="grid grid-cols-2 gap-4">
+          {pages.map((page, pageIndex) => (
+            <Card key={pageIndex} className="p-6">
+              <CardContent>
+                <div className="flex items-center justify-between mb-4">
+                  <input
+                    type="text"
+                    placeholder="Section Title (optional)"
+                    value={page.sectionTitle || ""}
+                    onChange={(e) => handleSectionTitleChange(pageIndex, e.target.value)}
+                    className="text-xl font-semibold p-2 border rounded flex-grow mr-4 bg-white text-black"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => deletePage(pageIndex)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className={`grid ${layouts[page.layout]} gap-4`}>
                   {page.photos.map((photo, photoIndex) => (
-                    <div key={photoIndex} className="flex flex-col space-y-2">
-                      <label 
-                        className="flex flex-col items-center justify-center w-full h-32 border border-gray-300 rounded-md cursor-pointer"
-                        style={{
-                          backgroundColor: background.color,
-                          opacity: background.opacity
-                        }}
-                      >
-                        {photo.image ? (
-                          <img src={photo.image} alt="Uploaded" className="max-w-full max-h-full object-contain" />
+                    <div key={photoIndex} className="aspect-square">
+                      <div className="relative w-full h-full">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => toggleContentType(pageIndex, photoIndex)}
+                          className="absolute top-2 right-2 z-10 bg-white"
+                        >
+                          {photo.isText ? <ImageIcon className="w-4 h-4" /> : <Type className="w-4 h-4" />}
+                        </Button>
+                        
+                        {photo.isText ? (
+                          <textarea
+                            value={photo.text || ""}
+                            onChange={(e) => handleTextContent(pageIndex, photoIndex, e.target.value)}
+                            placeholder="Enter text..."
+                            className="w-full h-full p-4 border rounded-lg resize-none bg-white text-black"
+                          />
                         ) : (
-                          <>
-                            <PlusCircle size={24} className="text-gray-400" />
-                            <span className="text-sm text-gray-500">Upload Photo</span>
-                          </>
+                          <label
+                            className="flex flex-col items-center justify-center w-full h-full border rounded-lg cursor-pointer overflow-hidden"
+                            style={{
+                              backgroundColor: background.color,
+                              opacity: background.opacity
+                            }}
+                          >
+                            {photo.image ? (
+                              <div className="relative w-full h-full group">
+                                <Image
+                                  src={photo.image}
+                                  alt={`Photo ${photoIndex + 1}`}
+                                  width={500}
+                                  height={500}
+                                  className="w-full h-full object-cover"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Add caption..."
+                                  value={photo.caption || ""}
+                                  onChange={(e) => handleCaptionChange(pageIndex, photoIndex, e.target.value)}
+                                  className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                />
+                              </div>
+                            ) : (
+                              <>
+                                <ImageIcon className="w-12 h-12 text-gray-400 mb-2"></ImageIcon>
+                                <span className="text-sm text-gray-500">Upload Image</span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*"
+                                  onChange={(e) =>
+                                    e.target.files && handleImageUpload(pageIndex, photoIndex, e.target.files[0])
+                                  }
+                                />
+                              </>
+                            )}
+                          </label>
                         )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                  onChange={(e) =>
-                            e.target.files && handleImageUpload(pageIndex, photoIndex, e.target.files[0])
-                          }
-                        />
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Caption (optional)"
-                        value={photo.caption || ""}
-                        onChange={(e) => handleCaptionChange(pageIndex, photoIndex, e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md text-black"
-                      />
+                      </div>
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          ))}
+ 
+          <Dialog open={isAddingPage} onOpenChange={setIsAddingPage}>
+            <DialogTrigger asChild>
+              <Button
+                className="w-full mt-6 flex items-center justify-center gap-2 py-6"
+                variant="outline"
+              >
+                <PlusCircle className="w-6 h-6" />
+                Add New Page
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Select Number of Photos</DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-3 gap-4 py-4">
+                {[1, 2, 3, 4, 5, 6].map((num) => (
+                  <Button
+                    key={num}
+                    variant={newPagePhotoCount === num ? "default" : "outline"}
+                    onClick={() => setNewPagePhotoCount(num)}
+                    className="h-20 text-lg"
+                  >
+                    {num} {num === 1 ? 'Photo' : 'Photos'}
+                  </Button>
+                ))}
               </div>
-            ))}
-
-            {/* Add Page Button */}
-            <div
-              onClick={addPage}
-              className="flex flex-col items-center justify-center border border-gray-300 rounded-md p-4 bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors"
-            >
-              <PlusCircle size={32} className="text-gray-400" />
-              <span className="text-sm text-gray-500">Add Page</span>
-            </div>
-          </div>
-
-          {/* Export to PDF Button */}
-          <Button
-            onClick={exportToPDF}
-            className="flex items-center px-6 py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors mb-8"
-          >
-            <Download size={16} className="mr-2" />
-            Export PDF
-          </Button>
-        </>
+              <Button onClick={addPage} className="w-full">Create Page</Button>
+            </DialogContent>
+          </Dialog>
+        </div>
       )}
     </div>
   );
-};
-
-export default PhotoBook;
+ };
+ 
+ export default PhotoBook;

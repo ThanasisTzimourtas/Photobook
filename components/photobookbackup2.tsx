@@ -12,7 +12,6 @@ import Image from 'next/image';
 import {
   Dialog, DialogContent, DialogHeader, 
   DialogTitle, DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, 
@@ -24,7 +23,6 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/components/ui/use-toast";
-import { storageService } from '@/lib/storage-service';
 
 interface Photo {
   id: string;
@@ -127,53 +125,15 @@ const PhotoBook = () => {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedPageId, setDraggedPageId] = useState<string | null>(null);
-  const [showResetDialog, setShowResetDialog] = useState(false);
 
-  // Update useEffect for loading data
   useEffect(() => {
-    const loadSavedData = async () => {
-      try {
-        const savedData = await storageService.loadPhotoBook();
-        if (savedData) {
-          const { pages: savedPages, title: savedTitle, coverPhoto: savedCover } = savedData;
-          setPages(savedPages);
-          setTitle(savedTitle);
-          setCoverPhoto(savedCover);
-        }
-      } catch (error) {
-        console.error('Error loading saved data:', error);
-        toast({
-          title: "Error loading saved data",
-          description: "Could not load your saved photobook. Starting fresh.",
-          variant: "destructive"
-        });
-      }
-    };
-  
-    loadSavedData();
-  }, []);
-  
-  useEffect(() => {
-    const initStorage = async () => {
-      try {
-        const savedData = await storageService.loadPhotoBook();
-        if (savedData) {
-          setPages(savedData.pages);
-          setTitle(savedData.title);
-          setCoverPhoto(savedData.coverPhoto);
-          setWelcomeScreen(false);
-        }
-      } catch (error) {
-        console.error('Error loading saved data:', error);
-        toast({
-          title: "Error loading saved data",
-          description: "Could not load your saved photobook. Starting fresh.",
-          variant: "destructive"
-        });
-      }
-    };
-
-    initStorage();
+    const savedBook = localStorage.getItem('photobook');
+    if (savedBook) {
+      const { pages: savedPages, title: savedTitle, coverPhoto: savedCover } = JSON.parse(savedBook);
+      setPages(savedPages);
+      setTitle(savedTitle);
+      setCoverPhoto(savedCover);
+    }
   }, []);
 
   useEffect(() => {
@@ -195,72 +155,13 @@ const PhotoBook = () => {
     });
   };
 
-  const resetPhotobook = async () => {
-    try {
-      await storageService.clearStorage();
-      setPages([]);
-      setTitle("");
-      setCoverPhoto(undefined);
-      setWelcomeScreen(true);
-      setBackground({
-        color: "#F1F1F1",
-        opacity: 1
-      });
-      setCurrentLayout("grid");
-      setHistory([]);
-      setHistoryIndex(-1);
-      setShowResetDialog(false);
-      
-      toast({
-        title: "PhotoBook Reset",
-        description: "Your photobook has been reset to default state",
-      });
-    } catch (error) {
-      console.error('Error resetting photobook:', error);
-      toast({
-        title: "Error",
-        description: "Could not reset photobook. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  
-  const saveToStorage = async () => {
-    try {
-      await storageService.savePhotoBook({
-        pages,
-        title,
-        coverPhoto
-      });
-      
-      toast({
-        title: "Changes saved",
-        description: "Photobook saved successfully",
-      });
-    } catch (error) {
-      console.error('Error saving photobook:', error);
-      toast({
-        title: "Error saving",
-        description: "Could not save your photobook. Try again or export to PDF.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const addToHistory = (newPages: PhotoPage[]) => {
-    const newHistory = [...history.slice(0, historyIndex + 1), newPages];
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
-
   const handleSectionTitleChange = (pageIndex: number, sectionTitle: string) => {
     const updatedPages = [...pages];
     updatedPages[pageIndex].sectionTitle = sectionTitle;
     setPages(updatedPages);
     addToHistory(updatedPages);
   };
-  
+
   const toggleContentType = (pageIndex: number, photoIndex: number) => {
     const updatedPages = [...pages];
     const photo = updatedPages[pageIndex].photos[photoIndex];
@@ -273,7 +174,13 @@ const PhotoBook = () => {
     setPages(updatedPages);
     addToHistory(updatedPages);
   };
-  
+
+  const addToHistory = (newPages: PhotoPage[]) => {
+    const newHistory = [...history.slice(0, historyIndex + 1), newPages];
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
   const handleImageUpload = (pageIndex: number, photoIndex: number, file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -288,7 +195,7 @@ const PhotoBook = () => {
     };
     reader.readAsDataURL(file);
   };
-  
+
   const handleTextContent = (pageIndex: number, photoIndex: number, text: string) => {
     const updatedPages = [...pages];
     updatedPages[pageIndex].photos[photoIndex] = {
@@ -299,61 +206,43 @@ const PhotoBook = () => {
     setPages(updatedPages);
     addToHistory(updatedPages);
   };
-  
+
   const handleCaptionChange = (pageIndex: number, photoIndex: number, caption: string) => {
     const updatedPages = [...pages];
     updatedPages[pageIndex].photos[photoIndex].caption = caption;
     setPages(updatedPages);
     addToHistory(updatedPages);
   };
-  
+
   const handleFilterChange = (pageIndex: number, photoIndex: number, filter: string) => {
     const updatedPages = [...pages];
     updatedPages[pageIndex].photos[photoIndex].filter = filter;
     setPages(updatedPages);
     addToHistory(updatedPages);
   };
-  
-  const addPage = async () => {
-    try {
-      const newPage: PhotoPage = {
+
+  const addPage = () => {
+    const newPage: PhotoPage = {
+      id: generateId(),
+      photos: Array.from({ length: newPagePhotoCount }, () => ({ 
         id: generateId(),
-        photos: Array.from({ length: newPagePhotoCount }, () => ({ 
-          id: generateId(),
-          image: undefined, 
-          caption: "", 
-          text: "",
-          isText: false 
-        })),
-        sectionTitle: "",
-        layout: currentLayout,
-        photosPerPage: newPagePhotoCount,
-        backgroundColor: background.color,
-        backgroundOpacity: background.opacity
-      };
-      
-      const updatedPages = [...pages, newPage];
-      setPages(updatedPages);
-      addToHistory(updatedPages);
-      
-      // Save after adding the page
-      await storageService.savePhotoBook({
-        pages: updatedPages,
-        title,
-        coverPhoto
-      });
-      
-      setIsAddingPage(false);
-    } catch (error) {
-      console.error('Error adding page:', error);
-      toast({
-        title: "Error",
-        description: "Could not add page. Please try again.",
-        variant: "destructive"
-      });
-    }
+        image: undefined, 
+        caption: "", 
+        text: "",
+        isText: false 
+      })),
+      sectionTitle: "",
+      layout: currentLayout,
+      photosPerPage: newPagePhotoCount,
+      backgroundColor: background.color,
+      backgroundOpacity: background.opacity
+    };
+    const updatedPages = [...pages, newPage];
+    setPages(updatedPages);
+    addToHistory(updatedPages);
+    setIsAddingPage(false);
   };
-  
+
   const duplicatePage = (pageIndex: number) => {
     const pageToClone = pages[pageIndex];
     const newPage: PhotoPage = {
@@ -368,57 +257,41 @@ const PhotoBook = () => {
     setPages(updatedPages);
     addToHistory(updatedPages);
   };
-  
+
   const deletePage = (pageIndex: number) => {
     const updatedPages = pages.filter((_, index) => index !== pageIndex);
     setPages(updatedPages);
     addToHistory(updatedPages);
   };
-  
-  // Replace the saveToStorage function with this:
-  const saveToLocalStorage = async () => {
-    try {
-      const photoBookData = { pages, title, coverPhoto };
-      await storageService.savePhotoBook(photoBookData);
-      
-      // Get storage size in MB
-      const size = await storageService.getStorageSize();
-      const sizeInMB = size / (1024 * 1024);
-      
-      toast({
-        title: "Changes saved",
-        description: `Photobook saved successfully (${sizeInMB.toFixed(2)}MB used)`,
-      });
-    } catch (error) {
-      console.error('Error saving photobook:', error);
-      toast({
-        title: "Error saving",
-        description: "Could not save your photobook. Try again or export to PDF.",
-        variant: "destructive"
-      });
-    }
+
+  const saveToLocalStorage = () => {
+    localStorage.setItem('photobook', JSON.stringify({ pages, title, coverPhoto }));
+    toast({
+      title: "Changes saved",
+      description: "Your photobook has been saved to local storage",
+    });
   };
-  
+
   const undo = () => {
     if (historyIndex > 0) {
       setHistoryIndex(historyIndex - 1);
       setPages(history[historyIndex - 1]);
     }
   };
-  
+
   const redo = () => {
     if (historyIndex < history.length - 1) {
       setHistoryIndex(historyIndex + 1);
       setPages(history[historyIndex + 1]);
     }
   };
-  
+
   const handleDragStart = (e: React.DragEvent, pageId: string) => {
     setIsDragging(true);
     setDraggedPageId(pageId);
     e.dataTransfer.effectAllowed = 'move';
   };
-  
+
   const handleDragOver = (e: React.DragEvent, pageId: string) => {
     e.preventDefault();
     if (draggedPageId && draggedPageId !== pageId) {
@@ -430,13 +303,13 @@ const PhotoBook = () => {
       setPages(updatedPages);
     }
   };
-  
+
   const handleDragEnd = () => {
     setIsDragging(false);
     setDraggedPageId(null);
     addToHistory(pages);
   };
-  
+
   const exportToPDF = async () => {
     try {
       const pdf = new jsPDF({
@@ -444,17 +317,17 @@ const PhotoBook = () => {
         unit: "mm",
         format: "a4",
       });
-  
+
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 20;
-  
+
       // Cover Page
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, pageWidth, pageHeight, 'F');
       pdf.setFontSize(24);
       pdf.text(title || "My PhotoBook", pageWidth / 2, 40, { align: "center" });
-  
+
       if (coverPhoto) {
         try {
           const dimensions = await getImageDimensions(coverPhoto);
@@ -468,39 +341,39 @@ const PhotoBook = () => {
             imgHeight = maxHeight;
             imgWidth = imgHeight * aspectRatio;
           }
-  
+
           const x = (pageWidth - imgWidth) / 2;
           pdf.addImage(coverPhoto, 'JPEG', x, 60, imgWidth, imgHeight);
         } catch (error) {
           console.error('Error loading cover photo:', error);
         }
       }
-  
+
       // Content Pages
       for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
         const page = pages[pageIndex];
         pdf.addPage();
-  
+
         if (page.sectionTitle) {
           pdf.setFontSize(18);
           pdf.text(page.sectionTitle, pageWidth / 2, margin, { align: "center" });
         }
-  
+
         const titleSpace = page.sectionTitle ? 15 : 0;
         const availableHeight = pageHeight - (2 * margin) - titleSpace;
         const photosPerRow = page.layout === 'single' ? 1 : page.layout === 'featured' ? 3 : 2;
         const rows = Math.ceil(page.photos.length / photosPerRow);
-  
+
         const photoWidth = (pageWidth - (2 * margin) - ((photosPerRow - 1) * 10)) / photosPerRow;
         const photoHeight = (availableHeight - ((rows - 1) * 10)) / rows;
-  
+
         for (let photoIndex = 0; photoIndex < page.photos.length; photoIndex++) {
           const photo = page.photos[photoIndex];
           const row = Math.floor(photoIndex / photosPerRow);
           const col = photoIndex % photosPerRow;
           const x = margin + (col * (photoWidth + 10));
           const y = margin + titleSpace + (row * (photoHeight + 10));
-  
+
           if (photo.isText && photo.text) {
             pdf.setFontSize(12);
             pdf.text(photo.text, x, y + 10, {
@@ -514,14 +387,14 @@ const PhotoBook = () => {
               console.error(`Error processing photo ${photoIndex}:`, error);
             }
           }
-  
+
           if (photo.caption) {
             pdf.setFontSize(10);
             pdf.text(photo.caption, x + photoWidth / 2, y + photoHeight + 5, { align: "center" });
           }
         }
       }
-  
+
       pdf.save(`${title || 'photobook'}.pdf`);
       toast({
         title: "PDF exported successfully",
@@ -592,7 +465,7 @@ const PhotoBook = () => {
                   />
                 </label>
               </div>
-  
+
               {title && coverPhoto && (
                 <Dialog>
                   <DialogTrigger asChild>
@@ -603,7 +476,7 @@ const PhotoBook = () => {
                       <DialogTitle>Select Number of Photos</DialogTitle>
                     </DialogHeader>
                     <div className="grid grid-cols-3 gap-4 py-4">
-                      {[1,, 2, 3, 4, 5, 6].map((num) => (
+                      {[1, 2, 3, 4, 5, 6].map((num) => (
                         <Button
                           key={num}
                           variant={newPagePhotoCount === num ? "default" : "outline"}
@@ -622,6 +495,7 @@ const PhotoBook = () => {
           </CardContent>
         </Card>
       ) : (
+        // Continue with the main content JSX
         <div className="max-w-5xl mx-auto space-y-6">
           <Card className="p-4 sticky top-4 z-50 bg-white/95 backdrop-blur">
             <div className="flex items-center justify-between gap-4">
@@ -629,17 +503,17 @@ const PhotoBook = () => {
                 <Select value={currentLayout} onValueChange={setCurrentLayout}>
                   <SelectTrigger className="w-40">
                     <Layout className="w-4 h-4 mr-2" />
-                    <SelectValue defaultValue="grid" className="text-black">
+                    <SelectValue defaultValue="grid">
                       {layouts[currentLayout as keyof typeof layouts]}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(layouts).map(([key, value]) => (
-                      <SelectItem key={key} value={key} className="text-black">{value}</SelectItem>
+                      <SelectItem key={key} value={key}>{value}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-  
+
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="flex items-center gap-2">
@@ -670,7 +544,7 @@ const PhotoBook = () => {
                     </div>
                   </PopoverContent>
                 </Popover>
-  
+
                 <Button
                   variant="outline"
                   onClick={undo}
@@ -679,7 +553,7 @@ const PhotoBook = () => {
                 >
                   <Undo className="w-4 h-4" />
                 </Button>
-  
+
                 <Button
                   variant="outline"
                   onClick={redo}
@@ -688,48 +562,20 @@ const PhotoBook = () => {
                 >
                   <Redo className="w-4 h-4" />
                 </Button>
-  
-                <Button onClick={saveToStorage} variant="outline" className="flex items-center gap-2">
+
+                <Button onClick={saveToLocalStorage} variant="outline" className="flex items-center gap-2">
                   <Save className="w-4 h-4" />
                   Save
                 </Button>
               </div>
-  
-              <div className="flex items-center gap-2">
-                <Button onClick={exportToPDF} className="flex items-center gap-2">
-                  <Download className="w-4 h-4" />
-                  Export PDF
-                </Button>
-                <Button 
-                  variant="destructive"
-                  onClick={() => setShowResetDialog(true)}
-                  className="flex items-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Reset
-                </Button>
-              </div>
+
+              <Button onClick={exportToPDF} className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Export PDF
+              </Button>
             </div>
           </Card>
-  
-          {/* Reset Confirmation Dialog */}
-          <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Reset PhotoBook?</DialogTitle>
-              </DialogHeader>
-              <p className="py-4">This will delete all pages and reset the photobook to its initial state. This action cannot be undone.</p>
-              <DialogFooter className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowResetDialog(false)}>
-                  Cancel
-                </Button>
-                <Button variant="destructive" onClick={resetPhotobook}>
-                  Reset Everything
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-  
+
           {/* Pages */}
           {pages.map((page, pageIndex) => (
             <Card
@@ -769,7 +615,7 @@ const PhotoBook = () => {
                     </Button>
                   </div>
                 </div>
-  
+
                 <div className={`grid ${page.layout === 'carousel' ? '' : layoutClasses[page.layout]}`}>
                   {page.photos.map((photo, photoIndex) => (
                     <div key={photo.id} className="aspect-square">
@@ -868,7 +714,7 @@ const PhotoBook = () => {
               </CardContent>
             </Card>
           ))}
-  
+
           <Dialog open={isAddingPage} onOpenChange={setIsAddingPage}>
             <DialogTrigger asChild>
               <Button
@@ -902,6 +748,6 @@ const PhotoBook = () => {
       )}
     </div>
   );
-  };
-  
-  export default PhotoBook;
+};
+
+export default PhotoBook;

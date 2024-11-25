@@ -143,6 +143,7 @@ const PhotoBook = () => {
       } catch (error) {
         console.error('Error loading saved data:', error);
         toast({
+          id: String(Date.now()),
           title: "Error loading saved data",
           description: "Could not load your saved photobook. Starting fresh.",
           variant: "destructive"
@@ -166,11 +167,13 @@ const PhotoBook = () => {
       } catch (error) {
         console.error('Error loading saved data:', error);
         toast({
+          id: String(Date.now()), // Add a unique ID for the toast
           title: "Error loading saved data",
           description: "Could not load your saved photobook. Starting fresh.",
-          variant: "destructive"
+          variant: "destructive",
         });
       }
+
     };
 
     initStorage();
@@ -218,6 +221,7 @@ const PhotoBook = () => {
     } catch (error) {
       console.error('Error resetting photobook:', error);
       toast({
+        id: String(Date.now()),
         title: "Error",
         description: "Could not reset photobook. Please try again.",
         variant: "destructive"
@@ -241,6 +245,7 @@ const PhotoBook = () => {
     } catch (error) {
       console.error('Error saving photobook:', error);
       toast({
+        id: String(Date.now()),
         title: "Error saving",
         description: "Could not save your photobook. Try again or export to PDF.",
         variant: "destructive"
@@ -347,6 +352,7 @@ const PhotoBook = () => {
     } catch (error) {
       console.error('Error adding page:', error);
       toast({
+        id: String(Date.now()),
         title: "Error",
         description: "Could not add page. Please try again.",
         variant: "destructive"
@@ -392,6 +398,7 @@ const PhotoBook = () => {
     } catch (error) {
       console.error('Error saving photobook:', error);
       toast({
+        id: String(Date.now()),
         title: "Error saving",
         description: "Could not save your photobook. Try again or export to PDF.",
         variant: "destructive"
@@ -530,6 +537,7 @@ const PhotoBook = () => {
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast({
+        id: String(Date.now()),
         title: "Error",
         description: "Failed to generate PDF. Please try again.",
         variant: "destructive",

@@ -1,15 +1,18 @@
-// components/ui/use-toast.tsx
 import * as React from "react"
 import { Toast, ToastActionElement, ToastProps } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
 
+// Define ToasterToast with onOpenChange
 type ToasterToast = ToastProps & {
   id: string
-  title?: React.ReactNode
-  description?: React.ReactNode
+  title?: string | React.ReactNode
+  description?: string | React.ReactNode
   action?: ToastActionElement
+  variant?: "default" | "destructive"
+  open: boolean
+  onOpenChange?: (open: boolean) => void // Add onOpenChange with a proper type
 }
 
 const actionTypes = {
@@ -94,7 +97,7 @@ export const reducer = (state: State, action: Action): State => {
           t.id === toastId || toastId === undefined
             ? {
                 ...t,
-                open: false,
+                open: false, // Set open to false when dismissing
               }
             : t
         ),
@@ -125,18 +128,10 @@ function dispatch(action: Action) {
   })
 }
 
-interface Toast {
-  id: string
-  title?: React.ReactNode
-  description?: React.ReactNode
-  action?: ToastActionElement
-  variant?: "default" | "destructive"
-}
-
-export function toast({ ...props }: Toast) {
+export function toast({ ...props }: ToasterToast) {
   const id = props.id || String(Date.now())
 
-  const update = (props: Toast) => {
+  const update = (props: ToasterToast) => {
     dispatch({
       type: "UPDATE_TOAST",
       toast: { ...props, id },
@@ -150,14 +145,15 @@ export function toast({ ...props }: Toast) {
     })
   }
 
+  // Ensure onOpenChange is called with the proper open state
   dispatch({
     type: "ADD_TOAST",
     toast: {
       ...props,
       id,
-      open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss()
+      open: true, // Ensure open is set to true when adding a toast
+      onOpenChange: (open: boolean) => {
+        if (!open) dismiss() // Use open: boolean in the callback
       },
     },
   })

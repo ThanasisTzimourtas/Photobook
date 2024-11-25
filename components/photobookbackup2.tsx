@@ -401,13 +401,15 @@ const PhotoBook = () => {
         description: "Your photobook has been saved as a PDF file",
       });
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error('Error loading saved data:', error);
       toast({
-        title: "Error",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
+        id: String(Date.now()), // Unique identifier for the toast
+        title: "Error loading saved data",
+        description: "Could not load your saved photobook. Starting fresh.",
+        variant: "destructive"
       });
     }
+
   };
 
   return (

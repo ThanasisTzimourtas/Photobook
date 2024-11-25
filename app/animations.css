@@ -1,0 +1,39 @@
+@keyframes pageFlipRight {
+  0% { 
+    transform: perspective(2000px) rotateY(0);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% { 
+    transform: perspective(2000px) rotateY(-180deg);
+    opacity: 1;
+  }
+}
+
+@keyframes pageFlipLeft {
+  0% { 
+    transform: perspective(2000px) rotateY(0);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% { 
+    transform: perspective(2000px) rotateY(180deg);
+    opacity: 1;
+  }
+}
+
+.animate-page-flip-right {
+  animation: pageFlipRight 0.5s ease-in-out;
+}
+
+.animate-page-flip-left {
+  animation: pageFlipLeft 0.5s ease-in-out;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}

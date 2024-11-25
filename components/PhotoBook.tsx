@@ -193,6 +193,7 @@ const PhotoBook = () => {
     };
     reader.readAsDataURL(file);
     toast({
+      id: String(Date.now()),
       title: "Cover photo updated",
       description: "Your photobook cover has been updated successfully",
     });
@@ -215,6 +216,7 @@ const PhotoBook = () => {
       setShowResetDialog(false);
       
       toast({
+        id: String(Date.now()),
         title: "PhotoBook Reset",
         description: "Your photobook has been reset to default state",
       });
@@ -239,6 +241,7 @@ const PhotoBook = () => {
       });
       
       toast({
+        id: String(Date.now()),
         title: "Changes saved",
         description: "Photobook saved successfully",
       });
@@ -392,6 +395,7 @@ const PhotoBook = () => {
       const sizeInMB = size / (1024 * 1024);
       
       toast({
+        id: String(Date.now()),
         title: "Changes saved",
         description: `Photobook saved successfully (${sizeInMB.toFixed(2)}MB used)`,
       });
@@ -531,6 +535,7 @@ const PhotoBook = () => {
   
       pdf.save(`${title || 'photobook'}.pdf`);
       toast({
+        id: String(Date.now()),
         title: "PDF exported successfully",
         description: "Your photobook has been saved as a PDF file",
       });

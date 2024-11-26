@@ -4,15 +4,12 @@ import { Toast, ToastActionElement, ToastProps } from "@/components/ui/toast"
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
 
-// Define ToasterToast with onOpenChange
 type ToasterToast = ToastProps & {
   id: string
   title?: string | React.ReactNode
   description?: string | React.ReactNode
   action?: ToastActionElement
   variant?: "default" | "destructive"
-  open: boolean
-  onOpenChange?: (open: boolean) => void // Add onOpenChange with a proper type
 }
 
 const actionTypes = {
@@ -97,7 +94,7 @@ export const reducer = (state: State, action: Action): State => {
           t.id === toastId || toastId === undefined
             ? {
                 ...t,
-                open: false, // Set open to false when dismissing
+                open: false,
               }
             : t
         ),
@@ -145,17 +142,16 @@ export function toast({ ...props }: ToasterToast) {
     })
   }
 
-  // Ensure onOpenChange is called with the proper open state
   dispatch({
     type: "ADD_TOAST",
     toast: {
       ...props,
       id,
-      open: true, // Ensure open is set to true when adding a toast
-      onOpenChange: (open: boolean) => {
-        if (!open) dismiss() // Use open: boolean in the callback
+    //  open: true,
+      //onOpenChange: (open) => {
+       // if (!open) dismiss()
       },
-    },
+   // },
   })
 
   return {
